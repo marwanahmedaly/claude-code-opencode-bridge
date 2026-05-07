@@ -16,7 +16,7 @@ http://localhost:38765/anthropic/v1/messages
 Caddy Reverse Proxy (:38765)
     |
     v
-LiteLLM Proxy (:8000)
+Custom Proxy (:8001)  ← Anthropic → OpenAI translation + reasoning_content fix
     |
     v
 https://opencode.ai/zen/go/v1/chat/completions
@@ -24,6 +24,8 @@ https://opencode.ai/zen/go/v1/chat/completions
     v
 OpenCode Go Plan (kimi-k2.6, deepseek-v4-pro, etc.)
 ```
+
+> **Why a custom proxy?** LiteLLM 1.82+ drops `thinking` content when translating Anthropic assistant messages with `tool_calls` to OpenAI format. OpenCode's providers (Moonshot, DeepSeek, GLM) require `reasoning_content` on every assistant message that contains `tool_calls`. The custom proxy preserves this content, fixing the `400 BadRequest` error on multi-turn tool conversations.
 
 ---
 
@@ -174,25 +176,30 @@ Add to `~/.claude/settings.json` or `.claude/settings.local.json`:
 
 ## Configuration Files
 
-### `config.yaml`
+### `opencode-proxy.py`
 
-Defines the models and their upstream OpenCode endpoints. The `model_list` maps friendly names to OpenCode's API.
+**The core of this setup.** A custom FastAPI proxy that:
+- Receives Anthropic `/v1/messages` requests from Claude Code
+- Translates Anthropic format → OpenAI format
+- **Injects `reasoning_content`** into assistant messages that have `tool_calls` but no thinking content
+- Forwards to OpenCode and translates the response back to Anthropic format
 
-Key settings:
-- `api_base: https://opencode.ai/zen/go/v1` — OpenCode's gateway
-- `api_key: "os.environ/OPCODE_API_KEY"` — Reads key from env
-- `drop_params: true` — Strips unsupported parameters to prevent errors
+This fixes the `400 BadRequest` error that occurs on multi-turn tool conversations.
+
+### `Dockerfile.proxy`
+
+Builds the custom proxy image from `python:3.12-slim` with `fastapi`, `httpx`, and `uvicorn`.
 
 ### `docker-compose.yml`
 
 ```yaml
 services:
-  litellm:
-    image: ghcr.io/berriai/litellm:main-latest
+  opencode-proxy:
+    build:
+      context: .
+      dockerfile: Dockerfile.proxy
     environment:
       - OPCODE_API_KEY=${OPCODE_API_KEY}
-      - LITELLM_USE_CHAT_COMPLETIONS_URL_FOR_ANTHROPIC_MESSAGES=true  # CRITICAL
-    # ...
   proxy:
     image: caddy:2-alpine
     ports:
@@ -201,14 +208,18 @@ services:
 
 ### `Caddyfile`
 
-Routes `/anthropic/*` requests from Claude Code to the LiteLLM container:
+Routes `/anthropic/*` requests from Claude Code to the custom proxy:
 
 ```caddy
 :38765
 handle_path /anthropic/* {
-    reverse_proxy litellm:8000
+    reverse_proxy opencode-proxy:8001
 }
 ```
+
+### `config.yaml` (Fallback)
+
+LiteLLM config for direct OpenAI-format access. The custom proxy handles Anthropic translation instead.
 
 ### `.mcp.json` (Optional)
 
@@ -216,26 +227,19 @@ Project-level MCP server config for Claude Code. Currently includes Context7 for
 
 ---
 
-## The Critical Fix
+## The Critical Fix: `reasoning_content`
 
-**If you see 404 errors or HTML responses from OpenCode**, LiteLLM is routing Anthropic `/v1/messages` to the unsupported OpenAI **Responses API** (`/v1/responses`) instead of **Chat Completions** (`/v1/chat/completions`).
+When Claude Code sends a multi-turn conversation with tools, the assistant message contains `tool_calls` (from a previous turn). OpenCode's providers (Moonshot AI, DeepSeek, Zhipu GLM) require every assistant message with `tool_calls` to also include `reasoning_content`.
 
-**Fix:** Set this environment variable in `docker-compose.yml`:
-
-```yaml
-environment:
-  - LITELLM_USE_CHAT_COMPLETIONS_URL_FOR_ANTHROPIC_MESSAGES=true
+**Without the fix:**
+```
+API Error: 400 litellm.BadRequestError: OpenAIException - Error from provider:
+Provider returned error. Received Model Group=kimi-k2.6
 ```
 
-Then restart:
+**Root cause:** LiteLLM drops the `thinking` content block when translating Anthropic assistant messages to OpenAI format. The resulting assistant message has `tool_calls` but no `reasoning_content`, which Moonshot/DeepSeek/GLM reject.
 
-```bash
-docker compose down && docker compose up -d
-```
-
-### Why This Happens
-
-LiteLLM 1.82+ introduced experimental Anthropic passthrough that routes `openai/...` models to the OpenAI Responses API by default. OpenCode only supports Chat Completions. This flag forces LiteLLM to use the legacy (working) path.
+**Our fix:** The custom proxy (`opencode-proxy.py`) detects assistant messages with `tool_calls` but no `reasoning_content`, and injects a minimal placeholder (the original thinking content if available, otherwise `.`). This satisfies the provider's validation while preserving the conversation flow.
 
 ---
 
@@ -312,9 +316,11 @@ print(response.choices[0].message.content)
 ├── .mcp.json                    # MCP server config for Claude Code
 ├── aliases.zsh                  # Shell aliases for Claude Code models
 ├── Caddyfile                    # Reverse proxy rules
-├── config.yaml                  # LiteLLM model configuration
+├── config.yaml                  # LiteLLM model configuration (fallback)
 ├── config2.yaml                 # Alternative config (legacy)
 ├── docker-compose.yml           # Docker services
+├── Dockerfile.proxy             # Custom proxy image
+├── opencode-proxy.py            # Custom Anthropic→OpenAI proxy with reasoning fix
 ├── README.md                    # This file
 └── script.py                    # Example OpenAI SDK usage
 ```

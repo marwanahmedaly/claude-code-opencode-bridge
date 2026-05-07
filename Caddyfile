@@ -1,6 +1,13 @@
 :38765
 
+# Claude Code sends to /anthropic/v1/messages — route to our custom proxy
+# which properly translates Anthropic format with reasoning_content fix
 handle_path /anthropic/* {
+    reverse_proxy opencode-proxy:8001
+}
+
+# Fallback — direct LiteLLM access for OpenAI format
+handle_path /openai/* {
     reverse_proxy litellm:8000
 }
 
