@@ -66,8 +66,9 @@ OPCODE_API_KEY=sk-your-opencode-api-key-here
 docker compose up -d
 ```
 
-This starts two containers:
+This starts three containers:
 - `litellm-opencode` — The LiteLLM proxy (internal port `8000`)
+- `opencode-proxy` — Custom FastAPI proxy that translates Anthropic → OpenAI with `reasoning_content` fix (internal port `8001`)
 - `litellm-proxy` — Caddy reverse proxy (exposed on `38765`)
 
 ### 3. Verify It's Working
@@ -194,16 +195,40 @@ Builds the custom proxy image from `python:3.12-slim` with `fastapi`, `httpx`, a
 
 ```yaml
 services:
+  litellm:
+    image: ghcr.io/berriai/litellm:main-latest
+    container_name: litellm-opencode
+    expose:
+      - "8000"
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+    environment:
+      - OPCODE_API_KEY=${OPCODE_API_KEY}
+      - LITELLM_USE_CHAT_COMPLETIONS_URL_FOR_ANTHROPIC_MESSAGES=true
+    command: >
+      --config /app/config.yaml
+      --port 8000
+    restart: unless-stopped
+
   opencode-proxy:
     build:
       context: .
       dockerfile: Dockerfile.proxy
+    container_name: opencode-proxy
+    expose:
+      - "8001"
     environment:
       - OPCODE_API_KEY=${OPCODE_API_KEY}
+    restart: unless-stopped
+
   proxy:
     image: caddy:2-alpine
+    container_name: litellm-proxy
     ports:
       - "38765:38765"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+    restart: unless-stopped
 ```
 
 ### `Caddyfile`
