@@ -1,0 +1,26 @@
+version: "3.8"
+
+services:
+  litellm:
+    image: ghcr.io/berriai/litellm:main-latest
+    container_name: litellm-opencode
+    expose:
+      - "8000"
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+    environment:
+      - OPCODE_API_KEY=${OPCODE_API_KEY}
+      - LITELLM_USE_CHAT_COMPLETIONS_URL_FOR_ANTHROPIC_MESSAGES=true
+    command: >
+      --config /app/config.yaml
+      --port 8000
+    restart: unless-stopped
+
+  proxy:
+    image: caddy:2-alpine
+    container_name: litellm-proxy
+    ports:
+      - "38765:38765"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+    restart: unless-stopped

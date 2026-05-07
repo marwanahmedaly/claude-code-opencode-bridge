@@ -1,0 +1,101 @@
+general_settings:
+  master_key: dummy
+
+model_list:
+
+  # ── OpenAI-compatible (/zen/go/v1/chat/completions) ──
+
+  - model_name: kimi-k2.6
+    litellm_params:
+      model: openai/kimi-k2.6
+      api_base: https://opencode.ai/zen/go/v1
+      api_key: "os.environ/OPCODE_API_KEY"
+      drop_params: true
+
+  - model_name: kimi-k2.5
+    litellm_params:
+      model: openai/kimi-k2.5
+      api_base: https://opencode.ai/zen/go/v1
+      api_key: "os.environ/OPCODE_API_KEY"
+      drop_params: true
+
+  - model_name: deepseek-v4-pro
+    litellm_params:
+      model: openai/deepseek-v4-pro
+      api_base: https://opencode.ai/zen/go/v1
+      api_key: "os.environ/OPCODE_API_KEY"
+      drop_params: true
+
+  - model_name: deepseek-v4-flash
+    litellm_params:
+      model: openai/deepseek-v4-flash
+      api_base: https://opencode.ai/zen/go/v1
+      api_key: "os.environ/OPCODE_API_KEY"
+      drop_params: true
+
+  - model_name: glm-5.1
+    litellm_params:
+      model: openai/glm-5.1
+      api_base: https://opencode.ai/zen/go/v1
+      api_key: "os.environ/OPCODE_API_KEY"
+      drop_params: true
+
+  - model_name: glm-5
+    litellm_params:
+      model: openai/glm-5
+      api_base: https://opencode.ai/zen/go/v1
+      api_key: "os.environ/OPCODE_API_KEY"
+      drop_params: true
+
+  - model_name: mimo-v2.5-pro
+    litellm_params:
+      model: openai/mimo-v2.5-pro
+      api_base: https://opencode.ai/zen/go/v1
+      api_key: "os.environ/OPCODE_API_KEY"
+      drop_params: true
+
+  - model_name: mimo-v2.5
+    litellm_params:
+      model: openai/mimo-v2.5
+      api_base: https://opencode.ai/zen/go/v1
+      api_key: "os.environ/OPCODE_API_KEY"
+      drop_params: true
+
+  - model_name: qwen3.6-plus
+    litellm_params:
+      model: openai/qwen3.6-plus
+      api_base: https://opencode.ai/zen/go/v1
+      api_key: "os.environ/OPCODE_API_KEY"
+      drop_params: true
+
+  - model_name: qwen3.5-plus
+    litellm_params:
+      model: openai/qwen3.5-plus
+      api_base: https://opencode.ai/zen/go/v1
+      api_key: "os.environ/OPCODE_API_KEY"
+      drop_params: true
+
+  # ── Anthropic-native (/zen/go/v1/messages) ──
+  # NO /v1 in api_base — LiteLLM appends /v1/messages automatically
+
+  - model_name: minimax-m2.7
+    litellm_params:
+      model: anthropic/minimax-m2.7
+      api_base: https://opencode.ai/zen/go
+      api_key: "os.environ/OPCODE_API_KEY"
+      drop_params: true
+
+  - model_name: minimax-m2.5
+    litellm_params:
+      model: anthropic/minimax-m2.5
+      api_base: https://opencode.ai/zen/go
+      api_key: "os.environ/OPCODE_API_KEY"
+      drop_params: true
+
+router_settings:
+  routing_strategy: simple-shuffle
+  num_retries: 3
+
+litellm_settings:
+  drop_params: true
+  set_verbose: true

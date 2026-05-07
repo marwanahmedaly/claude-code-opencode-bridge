@@ -1,0 +1,9 @@
+:38765
+
+handle_path /anthropic/* {
+    reverse_proxy litellm:8000
+}
+
+handle {
+    respond "Not Found" 404
+}
