@@ -42,8 +42,8 @@ OpenCode Go Plan (kimi-k2.6, deepseek-v4-pro, etc.)
 ### 1. Clone & Configure
 
 ```bash
-git clone <your-repo-url>
-cd litellm-opencode-proxy
+git clone https://github.com/marwanahmedaly/claude-code-opencode-bridge.git
+cd claude-code-opencode-bridge
 ```
 
 Create a `.env` file:
@@ -96,7 +96,7 @@ curl -X POST http://localhost:38765/anthropic/v1/messages \
 Source the provided aliases in your `.zshrc`:
 
 ```bash
-source /home/marwan/litellm/aliases.zsh
+source /path/to/claude-code-opencode-bridge/aliases.zsh
 ```
 
 This gives you one-command shortcuts for every model:
@@ -240,6 +240,15 @@ Routes `/anthropic/*` requests from Claude Code to the custom proxy:
 handle_path /anthropic/* {
     reverse_proxy opencode-proxy:8001
 }
+
+# Direct LiteLLM access (OpenAI format)
+handle_path /openai/* {
+    reverse_proxy litellm:8000
+}
+
+handle {
+    respond "Not Found" 404
+}
 ```
 
 ### `config.yaml` (Fallback)
@@ -333,8 +342,6 @@ print(response.choices[0].message.content)
 
 ```
 .
-├── .claude/
-│   └── settings.local.json      # Claude Code project settings (model aliases)
 ├── .env                         # Your API key (not committed)
 ├── .env.example                 # Template for .env
 ├── .gitignore                   # Ignores .env
@@ -342,13 +349,20 @@ print(response.choices[0].message.content)
 ├── aliases.zsh                  # Shell aliases for Claude Code models
 ├── Caddyfile                    # Reverse proxy rules
 ├── config.yaml                  # LiteLLM model configuration (fallback)
-├── config2.yaml                 # Alternative config (legacy)
 ├── docker-compose.yml           # Docker services
 ├── Dockerfile.proxy             # Custom proxy image
 ├── opencode-proxy.py            # Custom Anthropic→OpenAI proxy with reasoning fix
 ├── README.md                    # This file
 └── script.py                    # Example OpenAI SDK usage
 ```
+
+---
+
+## Known limitations
+
+- Streaming responses use a simplified Anthropic event translation and have not been verified end to end. Non-streaming requests are the tested path.
+- The proxy is stateless and forwards requests to the OpenCode endpoint with your API key; keep it on localhost or behind your own network controls.
+- The model list reflects the OpenCode Go Plan at the time of writing and may change.
 
 ---
 
